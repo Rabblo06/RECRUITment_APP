@@ -1,17 +1,17 @@
 import 'package:flutter/material.dart';
 import 'offer_list_screen.dart';
 
-class NewOffersScreen extends StatelessWidget {
+class BookedScreen extends StatelessWidget {
   final String token;
-  const NewOffersScreen({super.key, required this.token});
+  const BookedScreen({super.key, required this.token});
 
   @override
   Widget build(BuildContext context) {
     return OfferListScreen(
       token: token,
-      title: "New Offers",
-      status: "offered",
-      allowActions: true,
+      title: "Booked",
+      status: "booking_confirmed",
+      allowActions: false,
     );
   }
 }

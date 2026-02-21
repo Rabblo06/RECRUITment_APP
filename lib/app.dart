@@ -6,10 +6,16 @@ class App extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    const bg = Color(0xFF0D241C);
+
     return MaterialApp(
       title: 'Recruitment App',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(useMaterial3: true),
+      theme: ThemeData(
+        brightness: Brightness.dark,
+        useMaterial3: true,
+        scaffoldBackgroundColor: bg,
+      ),
       home: const SplashScreen(),
     );
   }

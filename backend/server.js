@@ -7,6 +7,7 @@ import authRoutes from "./src/routes/auth.js";
 import userRoutes from "./src/routes/users.js";
 import offerRoutes from "./src/routes/offers.js";
 import adminRoutes from "./src/routes/admin.js";
+import telegramRoutes from "./src/routes/telegram.js";
 
 dotenv.config();
 
@@ -22,6 +23,7 @@ app.use("/auth", authRoutes);
 app.use("/users", userRoutes);
 app.use("/offers", offerRoutes);
 app.use("/admin", adminRoutes);
+app.use("/telegram", telegramRoutes);
 
 mongoose
     .connect(process.env.MONGO_URI)
