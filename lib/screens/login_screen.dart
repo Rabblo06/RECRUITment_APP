@@ -47,13 +47,30 @@ class _LoginScreenState extends State<LoginScreen> {
         throw Exception(data["message"] ?? "Login failed");
       }
 
-      // ✅ Expecting: { token: "...", user: { role: "admin/staff" } }
+      // ✅ Expecting: { token: "...", user: {...} }
       final token = data["token"];
       final user = data["user"];
       final role = (user is Map) ? user["role"] : null;
 
       if (token == null || role == null) {
         throw Exception("Login response missing token/role. Fix backend JSON.");
+      }
+
+      // ✅ Extract staffId from backend user object
+      final staffId = (user is Map)
+          ? (user["_id"] ?? user["id"] ?? user["userId"] ?? "").toString()
+          : "";
+
+      // ✅ Better staff name to display
+      final staffName = (user is Map)
+          ? (user["fullName"] ?? user["name"] ?? user["username"] ?? username)
+                .toString()
+          : username;
+
+      if (role == "staff" && staffId.isEmpty) {
+        throw Exception(
+          "Login response missing user id (_id). Fix backend JSON.",
+        );
       }
 
       if (!mounted) return;
@@ -73,7 +90,8 @@ class _LoginScreenState extends State<LoginScreen> {
         MaterialPageRoute(
           builder: (_) => StaffDashboardScreen(
             token: token,
-            staffName: username, // for now
+            staffName: staffName,
+            staffId: staffId,
           ),
         ),
       );
@@ -105,23 +123,19 @@ class _LoginScreenState extends State<LoginScreen> {
               style: TextStyle(fontSize: 26, fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 30),
-
             TextField(
               controller: usernameCtrl,
               decoration: const InputDecoration(labelText: "Username"),
             ),
             const SizedBox(height: 12),
-
             TextField(
               controller: passwordCtrl,
               decoration: const InputDecoration(labelText: "Password"),
               obscureText: true,
             ),
-
             const SizedBox(height: 12),
             if (error != null)
               Text(error!, style: const TextStyle(color: Colors.red)),
-
             const SizedBox(height: 20),
             SizedBox(
               width: double.infinity,

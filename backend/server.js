@@ -1,15 +1,15 @@
+// ✅ Load env FIRST (before importing routes)
+import "./src/config/env.js";
+
 import express from "express";
 import cors from "cors";
 import mongoose from "mongoose";
-import dotenv from "dotenv";
 
 import authRoutes from "./src/routes/auth.js";
 import userRoutes from "./src/routes/users.js";
 import offerRoutes from "./src/routes/offers.js";
 import adminRoutes from "./src/routes/admin.js";
 import telegramRoutes from "./src/routes/telegram.js";
-
-dotenv.config();
 
 const app = express();
 
@@ -29,6 +29,7 @@ mongoose
     .connect(process.env.MONGO_URI)
     .then(() => {
         console.log("MongoDB connected");
-        app.listen(process.env.PORT || 4000, () => console.log(`Server running on ${process.env.PORT || 4000}`));
+        const port = process.env.PORT || 4000;
+        app.listen(port, () => console.log(`Server running on ${port}`));
     })
     .catch((err) => console.error("MongoDB connection error:", err));

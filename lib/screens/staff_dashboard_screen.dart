@@ -5,19 +5,22 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../services/api.dart';
+import 'booking_details_screen.dart';
 import 'booked_screen.dart';
 import 'new_offers_screen.dart';
 import 'waiting_screen.dart';
-import 'booking_details_screen.dart';
+import 'check_in_out_screen.dart';
 
 class StaffDashboardScreen extends StatefulWidget {
   final String token;
   final String staffName;
+  final String staffId;
 
   const StaffDashboardScreen({
     super.key,
     required this.token,
     required this.staffName,
+    required this.staffId,
   });
 
   @override
@@ -33,15 +36,15 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
   int countWaiting = 0;
   int countConfirmed = 0;
 
-  int navIndex = 0;
-
-  // -------- Timer state --------
+  // timer
   Timer? _ticker;
   String timerText = "00:00:00";
 
   Map<String, dynamic>? nextShiftOffer;
   DateTime? nextShiftStart;
   DateTime? nextShiftEnd;
+
+  int navIndex = 0;
 
   @override
   void initState() {
@@ -92,20 +95,20 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
     }
   }
 
-  // ------------------ Timer logic ------------------
+  // ---------------- Timer logic ----------------
 
   void _startTicker() {
     _ticker?.cancel();
-    _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
-      _updateTimerText();
-    });
+    _ticker = Timer.periodic(
+      const Duration(seconds: 1),
+      (_) => _updateTimerText(),
+    );
   }
 
   void _setNextShiftFromConfirmed() {
     DateTime? bestStart;
     DateTime? bestEnd;
     Map<String, dynamic>? bestOffer;
-
     final now = DateTime.now();
 
     for (final offer in bookingConfirmed) {
@@ -116,13 +119,12 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
 
       final start = _combineDateAndTime(dateStr, startStr);
       final end = _combineDateAndTime(dateStr, endStr);
-
       if (start == null || end == null) continue;
 
-      // ignore already finished shifts
+      // ignore finished
       if (end.isBefore(now)) continue;
 
-      // choose the soonest upcoming (or current running)
+      // nearest upcoming / current
       final candidateKey = start.isAfter(now) ? start : now;
 
       if (bestStart == null) {
@@ -156,19 +158,14 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
     if (hm == null) return null;
 
     return DateTime(date.year, date.month, date.day, hm.$1, hm.$2);
-    // NOTE: endTime is assumed same day; if your shifts pass midnight tell me.
   }
 
   (int, int)? _parseTimeToHourMinute(String timeStr) {
     final s = timeStr.trim();
 
-    // "HH:mm"
-    final hm = RegExp(r'^(\d{1,2}):(\d{2})$').firstMatch(s);
-    if (hm != null) {
-      return (int.parse(hm.group(1)!), int.parse(hm.group(2)!));
-    }
+    final m = RegExp(r'^(\d{1,2}):(\d{2})$').firstMatch(s);
+    if (m != null) return (int.parse(m.group(1)!), int.parse(m.group(2)!));
 
-    // "h:mm AM/PM" or "h AM/PM"
     try {
       final dt = DateFormat.jm().parse(s);
       return (dt.hour, dt.minute);
@@ -185,22 +182,17 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
   void _updateTimerText() {
     final now = DateTime.now();
 
-    // Try to select next shift if missing
     if (nextShiftStart == null) {
-      if (bookingConfirmed.isNotEmpty) {
-        _setNextShiftFromConfirmed();
-      }
+      if (bookingConfirmed.isNotEmpty) _setNextShiftFromConfirmed();
       if (nextShiftStart == null) {
-        if (mounted && timerText != "00:00:00") {
+        if (mounted && timerText != "00:00:00")
           setState(() => timerText = "00:00:00");
-        }
         return;
       }
     }
 
-    // If shift finished, select the next one
-    final end = nextShiftEnd;
-    if (end != null && end.isBefore(now)) {
+    // if shift finished -> next
+    if (nextShiftEnd != null && nextShiftEnd!.isBefore(now)) {
       _setNextShiftFromConfirmed();
       if (nextShiftStart == null) {
         if (mounted) setState(() => timerText = "00:00:00");
@@ -211,15 +203,13 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
     final start = nextShiftStart!;
     final diff = start.difference(now);
 
-    // ✅ ALWAYS show HH:MM:SS
+    // ✅ Always HH:MM:SS
     if (diff.inSeconds > 0) {
-      // countdown to shift
       final txt = _formatHms(diff);
       if (mounted && timerText != txt) setState(() => timerText = txt);
       return;
     }
 
-    // elapsed since shift start
     final elapsed = now.difference(start);
     final txt = _formatHms(elapsed);
     if (mounted && timerText != txt) setState(() => timerText = txt);
@@ -230,10 +220,8 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
     final h = total ~/ 3600;
     final m = (total % 3600) ~/ 60;
     final s = total % 60;
-    return "${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}";
+    return "${h.toString().padLeft(2, "0")}:${m.toString().padLeft(2, "0")}:${s.toString().padLeft(2, "0")}";
   }
-
-  // ------------------ Date formatting for placement cards ------------------
 
   static String _formatWeekday(String dateStr) {
     final dt = _parseDate(dateStr);
@@ -253,7 +241,7 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
     }
   }
 
-  // ------------------ UI ------------------
+  // ---------------- UI ----------------
 
   @override
   Widget build(BuildContext context) {
@@ -377,9 +365,28 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
                       );
                     },
                     onTapCheck: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text("Check in/out screen next ✅"),
+                      if (nextShiftOffer == null ||
+                          nextShiftStart == null ||
+                          nextShiftEnd == null) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text("No booked shift found"),
+                          ),
+                        );
+                        return;
+                      }
+
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => CheckInOutScreen(
+                            token: widget.token,
+                            staffName: widget.staffName,
+                            staffId: widget.staffId,
+                            offer: nextShiftOffer!,
+                            shiftStart: nextShiftStart!,
+                            shiftEnd: nextShiftEnd!,
+                          ),
                         ),
                       );
                     },
@@ -726,8 +733,6 @@ class _SummaryTile extends StatelessWidget {
     );
   }
 }
-
-/* ---------------- Pay Slip ---------------- */
 
 /* ---------------- Bottom Nav ---------------- */
 

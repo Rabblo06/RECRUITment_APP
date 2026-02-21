@@ -13,42 +13,50 @@ async function sendTelegram(text) {
     }
 
     const url = `https://api.telegram.org/bot${BOT}/sendMessage`;
-
     const { data } = await axios.post(url, {
         chat_id: CHAT,
-        text: text,
+        text,
     });
 
-    // Telegram returns { ok: true/false, ... }
     if (!data || data.ok !== true) {
         throw new Error((data && data.description) ? data.description : "Telegram send failed");
     }
-
     return data;
 }
 
+// POST /telegram/check
 router.post("/check", requireAuth, async(req, res) => {
     try {
         const {
-            type,
+            type, // "checkin" | "checkout"
             staffId,
             staffName,
             offerId,
+
             venue,
             role,
             date,
             startTime,
             endTime,
+
             checkIn,
             checkOut,
             totalHours,
             amount,
         } = req.body;
 
-        const msg =
-            `🕒 ${(type || "").toUpperCase()}
+        const t = String(type || "").toLowerCase();
 
-👤 Staff: ${staffName} (${staffId})
+        // ✅ Simple check-in message
+        if (t === "checkin") {
+            const msg = `${staffName} check in`;
+            await sendTelegram(msg);
+            return res.json({ ok: true });
+        }
+
+        // ✅ Full checkout message
+        const msg =
+            `👤 Staff: ${staffName} (${staffId})
 🧾 Offer: ${offerId}
 
 🏨 Venue: ${venue}
@@ -63,9 +71,12 @@ router.post("/check", requireAuth, async(req, res) => {
 💰 Amount: £${amount ?? "-"}`;
 
         await sendTelegram(msg);
-        res.json({ ok: true });
+        return res.json({ ok: true });
     } catch (e) {
-        res.status(500).json({ message: "Telegram failed", error: String(e.message || e) });
+        return res.status(500).json({
+            message: "Telegram failed",
+            error: e && e.message ? e.message : String(e),
+        });
     }
 });
 
