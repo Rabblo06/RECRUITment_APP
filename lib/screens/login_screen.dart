@@ -1,8 +1,14 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:local_auth/local_auth.dart';
+
+import '../services/api.dart';
+import '../services/session.dart';
+import 'biometric_setup_screen.dart';
 
 import 'staff_dashboard_screen.dart';
+import '../services/session.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -16,11 +22,10 @@ class _LoginScreenState extends State<LoginScreen> {
   final passwordCtrl = TextEditingController();
 
   bool loading = false;
+  bool obscure = true;
   String? error;
 
   // ✅ Android emulator URL
-  static const String baseUrl = "http://10.0.2.2:4000";
-
   Future<void> _login() async {
     setState(() {
       loading = true;
@@ -36,7 +41,7 @@ class _LoginScreenState extends State<LoginScreen> {
       }
 
       final res = await http.post(
-        Uri.parse("$baseUrl/auth/login"),
+        Uri.parse("${Api.baseUrl}/auth/login"),
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({"username": username, "password": password}),
       );
@@ -84,6 +89,25 @@ class _LoginScreenState extends State<LoginScreen> {
         return; // stay on login
       }
 
+      // ✅ Save session (so splash can auto-login)
+      await Session.saveLogin(
+        token: token,
+        name: staffName,
+        role: role,
+        staffId: staffId,
+      );
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => StaffDashboardScreen(
+            token: token,
+            staffName: staffName,
+            staffId: staffId,
+          ),
+        ),
+      );
+
       // ✅ staff -> go to staff home
       Navigator.pushReplacement(
         context,
@@ -111,45 +135,202 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    const bg = Color(0xFFEFEFF3); // smooth single color like your prototype
+    const cardRadius = 18.0;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF7F3FB),
-      body: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Text(
-              "Login",
-              style: TextStyle(fontSize: 26, fontWeight: FontWeight.w600),
+      backgroundColor: bg,
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // Logo (uses asset if you add it, otherwise shows fallback icon)
+                Image.asset(
+                  "assets/icon.png",
+                  height: 58,
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => const Icon(
+                    Icons.search,
+                    size: 54,
+                    color: Color(0xFF555A62),
+                  ),
+                ),
+                const SizedBox(height: 10),
+
+                const Text(
+                  "Adolphus",
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF5A5F66),
+                    letterSpacing: 0.2,
+                  ),
+                ),
+                const SizedBox(height: 22),
+
+                // White card
+                Container(
+                  width: 320,
+                  padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(cardRadius),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x14000000),
+                        blurRadius: 18,
+                        offset: Offset(0, 10),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+                      _InputRow(
+                        icon: Icons.person,
+                        controller: usernameCtrl,
+                        hint: "Username",
+                        obscure: false,
+                        suffix: null,
+                      ),
+                      const SizedBox(height: 10),
+                      _DividerLine(),
+                      const SizedBox(height: 10),
+
+                      _InputRow(
+                        icon: Icons.lock,
+                        controller: passwordCtrl,
+                        hint: "Password",
+                        obscure: obscure,
+                        suffix: IconButton(
+                          onPressed: () => setState(() => obscure = !obscure),
+                          icon: Icon(
+                            obscure ? Icons.visibility : Icons.visibility_off,
+                            size: 18,
+                            color: const Color(0xFF8E939A),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      _DividerLine(),
+                      const SizedBox(height: 16),
+
+                      // Login button
+                      SizedBox(
+                        width: double.infinity,
+                        height: 44,
+                        child: ElevatedButton(
+                          onPressed: loading ? null : _login,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF1E1F24),
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(28),
+                            ),
+                          ),
+                          child: loading
+                              ? const SizedBox(
+                                  height: 18,
+                                  width: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation(
+                                      Colors.white,
+                                    ),
+                                  ),
+                                )
+                              : const Text(
+                                  "Login",
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    letterSpacing: 0.2,
+                                  ),
+                                ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 14),
+
+                if (error != null)
+                  Text(
+                    error!,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Colors.red,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+              ],
             ),
-            const SizedBox(height: 30),
-            TextField(
-              controller: usernameCtrl,
-              decoration: const InputDecoration(labelText: "Username"),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: passwordCtrl,
-              decoration: const InputDecoration(labelText: "Password"),
-              obscureText: true,
-            ),
-            const SizedBox(height: 12),
-            if (error != null)
-              Text(error!, style: const TextStyle(color: Colors.red)),
-            const SizedBox(height: 20),
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: ElevatedButton(
-                onPressed: loading ? null : _login,
-                child: loading
-                    ? const CircularProgressIndicator()
-                    : const Text("Login"),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
+    );
+  }
+}
+
+class _DividerLine extends StatelessWidget {
+  const _DividerLine();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(height: 1, color: const Color(0xFFE6E7EB));
+  }
+}
+
+class _InputRow extends StatelessWidget {
+  final IconData icon;
+  final TextEditingController controller;
+  final String hint;
+  final bool obscure;
+  final Widget? suffix;
+
+  const _InputRow({
+    required this.icon,
+    required this.controller,
+    required this.hint,
+    required this.obscure,
+    required this.suffix,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: const Color(0xFF8E939A)),
+        const SizedBox(width: 12),
+        Expanded(
+          child: TextField(
+            controller: controller,
+            obscureText: obscure,
+            style: const TextStyle(
+              fontSize: 14,
+              color: Color(0xFF2A2D33),
+              fontWeight: FontWeight.w500,
+            ),
+            decoration: InputDecoration(
+              hintText: hint,
+              hintStyle: const TextStyle(
+                fontSize: 13,
+                color: Color(0xFFB0B4BA),
+                fontWeight: FontWeight.w500,
+              ),
+              border: InputBorder.none,
+              isDense: true,
+              contentPadding: const EdgeInsets.symmetric(vertical: 8),
+            ),
+          ),
+        ),
+        if (suffix != null) suffix!,
+      ],
     );
   }
 }

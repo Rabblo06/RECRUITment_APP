@@ -10,6 +10,7 @@ import 'booked_screen.dart';
 import 'new_offers_screen.dart';
 import 'waiting_screen.dart';
 import 'check_in_out_screen.dart';
+import 'login_screen.dart';
 
 class StaffDashboardScreen extends StatefulWidget {
   final String token;
@@ -28,6 +29,8 @@ class StaffDashboardScreen extends StatefulWidget {
 }
 
 class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
+  final _scaffoldKey = GlobalKey<ScaffoldState>();
+
   bool loading = true;
   String? error;
 
@@ -185,8 +188,9 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
     if (nextShiftStart == null) {
       if (bookingConfirmed.isNotEmpty) _setNextShiftFromConfirmed();
       if (nextShiftStart == null) {
-        if (mounted && timerText != "00:00:00")
+        if (mounted && timerText != "00:00:00") {
           setState(() => timerText = "00:00:00");
+        }
         return;
       }
     }
@@ -203,7 +207,7 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
     final start = nextShiftStart!;
     final diff = start.difference(now);
 
-    // ✅ Always HH:MM:SS
+    // Always HH:MM:SS
     if (diff.inSeconds > 0) {
       final txt = _formatHms(diff);
       if (mounted && timerText != txt) setState(() => timerText = txt);
@@ -250,6 +254,84 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
     }
 
     return Scaffold(
+      key: _scaffoldKey,
+      drawer: _AppDrawer(
+        token: widget.token,
+        staffName: widget.staffName,
+        onOpenOffers: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => NewOffersScreen(
+                token: widget.token,
+                staffName: widget.staffName,
+                staffId: widget.staffId,
+              ),
+            ),
+          ).then((_) => _loadDashboard());
+        },
+        onOpenBookings: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => BookedScreen(
+                token: widget.token,
+                staffName: widget.staffName,
+                staffId: widget.staffId,
+              ),
+            ),
+          ).then((_) => _loadDashboard());
+        },
+        onOpenPastBookings: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const _PlaceholderScreen(title: "Past Bookings"),
+            ),
+          );
+        },
+        onOpenPayslips: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const _PlaceholderScreen(title: "Payslips"),
+            ),
+          );
+        },
+        onOpenLeadConsultant: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) =>
+                  const _PlaceholderScreen(title: "Lead Consultant"),
+            ),
+          );
+        },
+        onOpenNotifications: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const _PlaceholderScreen(title: "Notifications"),
+            ),
+          );
+        },
+        onOpenPersonalDetails: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) =>
+                  const _PlaceholderScreen(title: "Personal Details"),
+            ),
+          );
+        },
+        onLogout: () {
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (_) => const LoginScreen()),
+            (route) => false,
+          );
+        },
+      ),
       body: Stack(
         children: [
           const _GreenBackground(),
@@ -261,11 +343,7 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
                 children: [
                   _Header(
                     name: widget.staffName,
-                    onMenu: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text("Menu tapped")),
-                      );
-                    },
+                    onMenu: () => _scaffoldKey.currentState?.openDrawer(),
                   ),
                   const SizedBox(height: 18),
 
@@ -316,9 +394,13 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (_) => BookedScreen(token: widget.token),
+                            builder: (_) => BookedScreen(
+                              token: widget.token,
+                              staffName: widget.staffName,
+                              staffId: widget.staffId,
+                            ),
                           ),
-                        );
+                        ).then((_) => _loadDashboard());
                       },
                       style: TextButton.styleFrom(
                         foregroundColor: const Color(0xFFE0C482),
@@ -344,7 +426,11 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => NewOffersScreen(token: widget.token),
+                          builder: (_) => NewOffersScreen(
+                            token: widget.token,
+                            staffName: widget.staffName,
+                            staffId: widget.staffId,
+                          ),
                         ),
                       ).then((_) => _loadDashboard());
                     },
@@ -352,17 +438,25 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => WaitingScreen(token: widget.token),
+                          builder: (_) => WaitingScreen(
+                            token: widget.token,
+                            staffName: widget.staffName,
+                            staffId: widget.staffId,
+                          ),
                         ),
-                      );
+                      ).then((_) => _loadDashboard());
                     },
                     onTapBooked: () {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => BookedScreen(token: widget.token),
+                          builder: (_) => BookedScreen(
+                            token: widget.token,
+                            staffName: widget.staffName,
+                            staffId: widget.staffId,
+                          ),
                         ),
-                      );
+                      ).then((_) => _loadDashboard());
                     },
                     onTapCheck: () {
                       if (nextShiftOffer == null ||
@@ -376,7 +470,7 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
                         return;
                       }
 
-                      Navigator.push(
+                      Navigator.push<bool>(
                         context,
                         MaterialPageRoute(
                           builder: (_) => CheckInOutScreen(
@@ -388,7 +482,9 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
                             shiftEnd: nextShiftEnd!,
                           ),
                         ),
-                      );
+                      ).then((refresh) {
+                        if (refresh == true) _loadDashboard();
+                      });
                     },
                   ),
 
@@ -415,6 +511,257 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/* ---------------- Drawer ---------------- */
+
+class _AppDrawer extends StatelessWidget {
+  final String token;
+  final String staffName;
+
+  final VoidCallback onOpenPersonalDetails;
+  final VoidCallback onOpenOffers;
+  final VoidCallback onOpenBookings;
+  final VoidCallback onOpenPastBookings;
+  final VoidCallback onOpenPayslips;
+  final VoidCallback onOpenLeadConsultant;
+  final VoidCallback onOpenNotifications;
+  final VoidCallback onLogout;
+
+  const _AppDrawer({
+    required this.token,
+    required this.staffName,
+    required this.onOpenPersonalDetails,
+    required this.onOpenOffers,
+    required this.onOpenBookings,
+    required this.onOpenPastBookings,
+    required this.onOpenPayslips,
+    required this.onOpenLeadConsultant,
+    required this.onOpenNotifications,
+    required this.onLogout,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    const textColor = Color(0xFFE8F0EC);
+    const iconColor = Color(0xFFD5E2DB);
+
+    void go(VoidCallback fn) {
+      Navigator.pop(context);
+      fn();
+    }
+
+    return Drawer(
+      backgroundColor: const Color(0xFF0B1712),
+      child: SafeArea(
+        child: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Color(0xFF10261D), Color(0xFF08130F)],
+            ),
+          ),
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
+                child: Row(
+                  children: [
+                    IconButton(
+                      onPressed: () => go(() {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                const _PlaceholderScreen(title: "Settings"),
+                          ),
+                        );
+                      }),
+                      icon: const Icon(Icons.settings, color: iconColor),
+                    ),
+                    const Spacer(),
+                    Container(
+                      width: 54,
+                      height: 54,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(14),
+                        color: const Color(0xFF0E2119),
+                        border: Border.all(color: const Color(0xFF2A4A3B)),
+                      ),
+                      alignment: Alignment.center,
+                      child: const Text(
+                        "A",
+                        style: TextStyle(
+                          color: textColor,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 22,
+                        ),
+                      ),
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      onPressed: () => go(onOpenNotifications),
+                      icon: const Icon(
+                        Icons.notifications_none,
+                        color: iconColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(color: Color(0xFF2A4A3B), height: 1),
+
+              Padding(
+                padding: const EdgeInsets.fromLTRB(18, 12, 18, 10),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    staffName.isEmpty ? "Hi" : "Hi $staffName",
+                    style: const TextStyle(
+                      color: textColor,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
+
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  children: [
+                    _DrawerTile(
+                      icon: Icons.person_outline,
+                      title: "Personal Details",
+                      onTap: () => go(onOpenPersonalDetails),
+                    ),
+                    _DrawerTile(
+                      icon: Icons.calendar_today_outlined,
+                      title: "Offers",
+                      onTap: () => go(onOpenOffers),
+                    ),
+                    _DrawerTile(
+                      icon: Icons.work_outline,
+                      title: "Bookings",
+                      onTap: () => go(onOpenBookings),
+                    ),
+                    _DrawerTile(
+                      icon: Icons.history,
+                      title: "Past Bookings",
+                      onTap: () => go(onOpenPastBookings),
+                    ),
+                    _DrawerTile(
+                      icon: Icons.currency_pound,
+                      title: "Payslips",
+                      onTap: () => go(onOpenPayslips),
+                    ),
+                    _DrawerTile(
+                      icon: Icons.support_agent_outlined,
+                      title: "Lead Consultant",
+                      onTap: () => go(onOpenLeadConsultant),
+                    ),
+                    _DrawerTile(
+                      icon: Icons.notifications_none,
+                      title: "Notifications",
+                      onTap: () => go(onOpenNotifications),
+                    ),
+                    const SizedBox(height: 8),
+                    const Divider(color: Color(0xFF2A4A3B), height: 1),
+                  ],
+                ),
+              ),
+
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 10, 12, 14),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(14),
+                    onTap: () => go(onLogout),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0E2119),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: const Color(0xFF2A4A3B)),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.power_settings_new, color: iconColor),
+                          SizedBox(width: 10),
+                          Text(
+                            "Logout",
+                            style: TextStyle(
+                              color: textColor,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DrawerTile extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final VoidCallback onTap;
+
+  const _DrawerTile({
+    required this.icon,
+    required this.title,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    const textColor = Color(0xFFE8F0EC);
+    const iconColor = Color(0xFFD5E2DB);
+
+    return ListTile(
+      leading: Icon(icon, color: iconColor),
+      title: Text(
+        title,
+        style: const TextStyle(color: textColor, fontWeight: FontWeight.w600),
+      ),
+      trailing: const Icon(Icons.chevron_right, color: Color(0xFF86A497)),
+      onTap: onTap,
+      minLeadingWidth: 22,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+    );
+  }
+}
+
+class _PlaceholderScreen extends StatelessWidget {
+  final String title;
+  const _PlaceholderScreen({required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text(title)),
+      body: Center(
+        child: Text(
+          "$title (Coming soon)",
+          style: const TextStyle(fontSize: 16),
+        ),
       ),
     );
   }

@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'offer_list_screen.dart';
 
-class BookedScreen extends StatelessWidget {
+class PastBookingsScreen extends StatelessWidget {
   final String token;
   final String staffName;
   final String staffId;
 
-  const BookedScreen({
+  const PastBookingsScreen({
     super.key,
     required this.token,
     required this.staffName,
@@ -19,8 +19,8 @@ class BookedScreen extends StatelessWidget {
       token: token,
       staffName: staffName,
       staffId: staffId,
-      title: "Bookings",
-      status: "booking_confirmed",
+      title: "Past Bookings",
+      status: "completed",
       allowActions: false,
     );
   }

@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 
 class Api {
   // ✅ emulator
-  static const String baseUrl = "http://10.0.2.2:4000";
+  static const String baseUrl = "http://192.168.1.212:4000";
 
   static Future<dynamic> get(String path, {required String token}) async {
     final res = await http.get(

@@ -28,8 +28,7 @@ app.use("/telegram", telegramRoutes);
 mongoose
     .connect(process.env.MONGO_URI)
     .then(() => {
-        console.log("MongoDB connected");
         const port = process.env.PORT || 4000;
-        app.listen(port, () => console.log(`Server running on ${port}`));
+        app.listen(port, "0.0.0.0", () => console.log(`Server running on ${port}`));
     })
     .catch((err) => console.error("MongoDB connection error:", err));

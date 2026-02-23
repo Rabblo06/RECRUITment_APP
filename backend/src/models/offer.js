@@ -20,6 +20,11 @@ const OfferSchema = new mongoose.Schema({
     cancelReason: { type: String, default: "" },
     cancelledAt: { type: Date, default: null },
     completedAt: { type: Date, default: null },
+
+    checkInAt: { type: Date, default: null },
+    checkOutAt: { type: Date, default: null },
+    totalHoursWorked: { type: Number, default: 0 },
+    amountWorked: { type: Number, default: 0 },
 }, { timestamps: true });
 
 export default mongoose.model("offer", OfferSchema);

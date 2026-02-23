@@ -267,5 +267,69 @@ router.put("/admin/offers/:id", requireAuth, requireManagerOrAdmin, async(req, r
     }
 });
 
+// ✅ Staff: checkout -> mark offer completed (and store hours/amount)
+// Business rule: calculate from scheduled shift start time (not from tap time)
+router.post("/:id/checkout", requireAuth, async(req, res) => {
+    try {
+        const offer = await Offer.findById(req.params.id).populate("placementId");
+        if (!offer) return res.status(404).json({ message: "Offer not found" });
+
+        if (offer.userId.toString() !== req.user.id) {
+            return res.status(403).json({ message: "Not yours" });
+        }
+
+        if (offer.status !== "booking_confirmed") {
+            return res.status(400).json({ message: "Offer is not booking_confirmed" });
+        }
+
+        const p = offer.placementId;
+        if (!p) return res.status(400).json({ message: "Placement missing" });
+
+        // build Date from Placement.date + startTime ("HH:MM")
+        const base = new Date(p.date);
+        const m = String(p.startTime || "").trim().match(/^(\d{1,2}):(\d{2})$/);
+        if (Number.isNaN(base.getTime()) || !m) {
+            return res.status(400).json({ message: "Invalid placement start" });
+        }
+
+        const h = Number(m[1]);
+        const min = Number(m[2]);
+        const scheduledStart = new Date(
+            base.getFullYear(),
+            base.getMonth(),
+            base.getDate(),
+            h,
+            min,
+            0,
+            0
+        );
+
+        const now = new Date();
+        const minutes = Math.max(
+            0,
+            Math.floor((now.getTime() - scheduledStart.getTime()) / 60000)
+        );
+        const totalHours = minutes / 60;
+
+        const hourlyRate = Number(p.hourlyRate || p.payRate || p.rate || 0);
+        const amount = totalHours * hourlyRate;
+
+        // Save for admin/payroll
+        if (!offer.checkInAt) offer.checkInAt = scheduledStart;
+        offer.checkOutAt = now;
+        offer.totalHoursWorked = Number(totalHours.toFixed(2));
+        offer.amountWorked = Number(amount.toFixed(2));
+        offer.completedAt = now;
+
+        offer.status = "completed";
+        await offer.save();
+
+        return res.json({ ok: true, status: offer.status });
+    } catch (err) {
+        console.error("CHECKOUT ERROR:", err);
+        return res.status(500).json({ message: "Checkout failed" });
+    }
+});
+
 
 export default router;
