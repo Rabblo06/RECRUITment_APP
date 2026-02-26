@@ -11,6 +11,8 @@ dependencies:
   flutter:
     sdk: flutter
 
+  firebase_messaging: ^15.0.0
+  flutter_local_notifications: ^18.0.0
   cupertino_icons: ^1.0.8
 
   # Firebase

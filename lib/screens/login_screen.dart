@@ -9,6 +9,7 @@ import 'biometric_setup_screen.dart';
 
 import 'staff_dashboard_screen.dart';
 import '../services/session.dart';
+import '../services/notifications_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -89,6 +90,7 @@ class _LoginScreenState extends State<LoginScreen> {
         return; // stay on login
       }
 
+      await NotificationsService.init(jwtToken: token);
       // ✅ Save session (so splash can auto-login)
       await Session.saveLogin(
         token: token,

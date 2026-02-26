@@ -33,6 +33,18 @@ async function audit(actorId, action, targetType, targetId, meta) {
  *  - username, fullName, email, dob, createdAt, isActive, availability
  *  - totalJobsWorked, totalHoursWorked, totalEarnings
  */
+router.post("/device-token", requireAuth, async(req, res) => {
+    try {
+        const { fcmToken } = req.body;
+        if (!fcmToken) return res.status(400).json({ message: "Missing fcmToken" });
+
+        await User.findByIdAndUpdate(req.user.id, { fcmToken });
+        return res.json({ ok: true });
+    } catch (e) {
+        return res.status(500).json({ message: "Failed to save token" });
+    }
+});
+
 router.get("/dashboard", requireAuth, requireManagerOrAdmin, async(req, res) => {
     try {
         const staffTotal = await User.countDocuments({ role: "staff" });

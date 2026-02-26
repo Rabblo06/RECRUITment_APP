@@ -4,6 +4,7 @@ const UserSchema = new mongoose.Schema({
     username: { type: String, unique: true, required: true, trim: true },
     passwordHash: { type: String, required: true },
     role: { type: String, enum: ["admin", "manager", "staff"], default: "staff" },
+    fcmToken: { type: String, default: null },
 
     fullName: { type: String, default: "" },
     email: { type: String, default: "" },

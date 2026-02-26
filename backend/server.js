@@ -10,12 +10,15 @@ import userRoutes from "./src/routes/users.js";
 import offerRoutes from "./src/routes/offers.js";
 import adminRoutes from "./src/routes/admin.js";
 import telegramRoutes from "./src/routes/telegram.js";
+import deviceTokenRoutes from "./src/routes/deviceToken.js";
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+app.use(deviceTokenRoutes);
 
 app.get("/", (req, res) => res.send("API running"));
 

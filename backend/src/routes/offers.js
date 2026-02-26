@@ -2,12 +2,13 @@ import express from "express";
 import Offer from "../models/offer.js";
 import User from "../models/User.js";
 import Placement from "../models/Placement.js";
+import admin from "../config/firebaseAdmin.js";
 import { requireAuth, requireManagerOrAdmin } from "../middleware/auth.js";
 
 const router = express.Router();
 
 function toIsoDay(d) {
-    const dt = (d instanceof Date) ? d : new Date(d);
+    const dt = d instanceof Date ? d : new Date(d);
     if (Number.isNaN(dt.getTime())) return "";
     return dt.toISOString().slice(0, 10);
 }
@@ -17,8 +18,8 @@ function hmToMin(hm) {
     const s = String(hm).trim();
     const m = s.match(/^(\d{1,2}):(\d{2})$/);
     if (!m) return null;
-    const h = Number(m[1]),
-        min = Number(m[2]);
+    const h = Number(m[1]);
+    const min = Number(m[2]);
     if (h < 0 || h > 23 || min < 0 || min > 59) return null;
     return h * 60 + min;
 }
@@ -28,6 +29,26 @@ function overlap(aStart, aEnd, bStart, bEnd) {
     return aStart < bEnd && aEnd > bStart;
 }
 
+/**
+ * Send a push notification to one device token.
+ * This won't crash your route if FCM fails.
+ */
+async function sendPush(token, title, body, data = {}) {
+    if (!token) return;
+
+    try {
+        await admin.messaging().send({
+            token,
+            notification: { title, body },
+            // data values MUST be strings
+            data: Object.fromEntries(
+                Object.entries(data).map(([k, v]) => [k, String(v)])
+            ),
+        });
+    } catch (err) {
+        console.error("FCM send error:", (err && err.message) ? err.message : err);
+    }
+}
 
 // ✅ Admin sends offer (creates placement + offer)
 router.post("/send", requireAuth, requireManagerOrAdmin, async(req, res) => {
@@ -39,17 +60,22 @@ router.post("/send", requireAuth, requireManagerOrAdmin, async(req, res) => {
         }
 
         // 🚫 block suspended staff from receiving offers
-        const staff = await User.findById(userId).select("role isActive managerId");
-        if (!staff) return res.status(404).json({ message: "Staff not found" });
-        if (staff.role !== "staff") return res.status(400).json({ message: "Target user is not staff" });
+        const targetStaff = await User.findById(userId).select(
+            "role isActive managerId fcmToken username fullName"
+        );
+        if (!targetStaff) return res.status(404).json({ message: "Staff not found" });
+        if (targetStaff.role !== "staff")
+            return res.status(400).json({ message: "Target user is not staff" });
 
-        if (staff.isActive === false) {
-            return res.status(403).json({ message: "This staff account is suspended. Reactivate to send offers." });
+        if (targetStaff.isActive === false) {
+            return res.status(403).json({
+                message: "This staff account is suspended. Reactivate to send offers.",
+            });
         }
 
         // 🔒 manager ownership rule (optional but recommended)
         if (req.user.role === "manager") {
-            if (!staff.managerId || staff.managerId.toString() !== String(req.user.id)) {
+            if (!targetStaff.managerId || targetStaff.managerId.toString() !== String(req.user.id)) {
                 return res.status(403).json({ message: "Forbidden: not your staff" });
             }
         }
@@ -62,11 +88,12 @@ router.post("/send", requireAuth, requireManagerOrAdmin, async(req, res) => {
         const newEnd = hmToMin(placement.endTime);
 
         if (!day || newStart === null || newEnd === null) {
-            return res.status(400).json({ message: "Valid date/startTime/endTime required (YYYY-MM-DD, HH:MM)" });
+            return res.status(400).json({
+                message: "Valid date/startTime/endTime required (YYYY-MM-DD, HH:MM)",
+            });
         }
 
         // If end <= start, treat as overnight shift (e.g., 22:00-06:00)
-        // For conflict detection we’ll convert end by +24h
         let ns = newStart;
         let ne = newEnd;
         if (ne <= ns) ne += 24 * 60;
@@ -117,19 +144,18 @@ router.post("/send", requireAuth, requireManagerOrAdmin, async(req, res) => {
             });
         }
 
-
         // ✅ map desktop fields -> Placement schema fields
-        const p = await Placement.create({
+        const createdPlacement = await Placement.create({
             venue: placement.venue || "",
-            roleTitle: (placement.roleTitle || placement.position || ""),
+            roleTitle: placement.roleTitle || placement.position || "",
             date: new Date(placement.date),
             startTime: placement.startTime || "",
             endTime: placement.endTime || "",
 
-            hourlyRate: (placement.hourlyRate !== undefined && placement.hourlyRate !== null) ?
+            hourlyRate: placement.hourlyRate !== undefined && placement.hourlyRate !== null ?
                 placement.hourlyRate : 0,
 
-            totalHours: (placement.totalHours !== undefined && placement.totalHours !== null) ?
+            totalHours: placement.totalHours !== undefined && placement.totalHours !== null ?
                 placement.totalHours : 0,
 
             addressLine: placement.addressLine || "",
@@ -141,9 +167,16 @@ router.post("/send", requireAuth, requireManagerOrAdmin, async(req, res) => {
 
         const offer = await Offer.create({
             userId,
-            placementId: p._id,
+            placementId: createdPlacement._id,
             status: "offered",
         });
+
+        // 🔔 Send push to staff
+        await sendPush(
+            targetStaff.fcmToken,
+            "New Offer",
+            `${createdPlacement.roleTitle || "Shift"} • ${createdPlacement.venue || ""}`, { offerId: offer._id.toString() }
+        );
 
         return res.json({ offerId: offer._id.toString() });
     } catch (err) {
@@ -151,7 +184,6 @@ router.post("/send", requireAuth, requireManagerOrAdmin, async(req, res) => {
         return res.status(500).json({ message: err.message || "Send offer failed" });
     }
 });
-
 
 // ✅ Staff: get my offers (optional status filter)
 router.get("/my", requireAuth, async(req, res) => {
@@ -198,13 +230,12 @@ router.patch("/:id/respond", requireAuth, async(req, res) => {
 // ✅ Admin: pending confirmations
 router.get("/pending", requireAuth, requireManagerOrAdmin, async(req, res) => {
     try {
-        // pending offers = staff accepted offers waiting admin/manager decision
         const filter = { status: "user_accepted" };
 
         // ✅ Manager should only see offers for their own staff
         if (req.user.role === "manager") {
             const staffIds = await User.find({ role: "staff", managerId: req.user.id }).select("_id");
-            filter.userId = { $in: staffIds.map(s => s._id) };
+            filter.userId = { $in: staffIds.map((s) => s._id) };
         }
 
         const offers = await Offer.find(filter)
@@ -218,7 +249,6 @@ router.get("/pending", requireAuth, requireManagerOrAdmin, async(req, res) => {
         return res.status(500).json({ message: err.message || "Server error" });
     }
 });
-
 
 // ✅ Admin: approve/reject
 router.patch("/:id/decision", requireAuth, requireManagerOrAdmin, async(req, res) => {
@@ -249,13 +279,10 @@ router.put("/admin/offers/:id", requireAuth, requireManagerOrAdmin, async(req, r
         if (!offer.placementId)
             return res.status(400).json({ message: "Placement missing" });
 
-        // Only allow editing if pending / offered
-        // allow editing while not locked
         const editable = ["offered", "pending", "pending_approval", "user_accepted"];
         if (!editable.includes(offer.status)) {
             return res.status(400).json({ message: "Cannot edit this offer" });
         }
-
 
         Object.assign(offer.placementId, req.body);
         await offer.placementId.save();
@@ -305,10 +332,7 @@ router.post("/:id/checkout", requireAuth, async(req, res) => {
         );
 
         const now = new Date();
-        const minutes = Math.max(
-            0,
-            Math.floor((now.getTime() - scheduledStart.getTime()) / 60000)
-        );
+        const minutes = Math.max(0, Math.floor((now.getTime() - scheduledStart.getTime()) / 60000));
         const totalHours = minutes / 60;
 
         const hourlyRate = Number(p.hourlyRate || p.payRate || p.rate || 0);
@@ -330,6 +354,5 @@ router.post("/:id/checkout", requireAuth, async(req, res) => {
         return res.status(500).json({ message: "Checkout failed" });
     }
 });
-
 
 export default router;
