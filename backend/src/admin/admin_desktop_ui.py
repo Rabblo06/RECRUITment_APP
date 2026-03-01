@@ -15,7 +15,7 @@ from PySide6.QtWidgets import (
 
 from api_client import ApiClient
 
-BASE_URL = "http://localhost:4000"
+BASE_URL = "https://recruitment-apk-3b409a7f0460.herokuapp.com"
 
 
 # ----------------- Helpers -----------------

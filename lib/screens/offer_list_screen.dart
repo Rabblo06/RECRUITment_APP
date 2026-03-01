@@ -2,6 +2,8 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 
 import '../services/api.dart';
+import '../services/notifications_service.dart'; // ✅ ADD THIS
+
 import 'booking_details_screen.dart';
 import 'new_offers_screen.dart';
 import 'booked_screen.dart';
@@ -65,12 +67,38 @@ class _OfferListScreenState extends State<OfferListScreen> {
 
   Future<void> _respond(String offerId, String action) async {
     try {
+      // find the offer object first (so we can read placement)
+      final offer = offers.firstWhere((o) => o["_id"] == offerId);
+
       await Api.patch(
         "/offers/$offerId/respond",
         token: widget.token,
         body: {"action": action},
       );
+
+      if (action == "accept") {
+        final p = offer["placementId"]; // populated by backend
+        final date = DateTime.parse(p["date"]); // includes date
+        final startTime = (p["startTime"] as String); // "HH:MM"
+
+        final parts = startTime.split(":");
+        final start = DateTime(
+          date.year,
+          date.month,
+          date.day,
+          int.parse(parts[0]),
+          int.parse(parts[1]),
+        );
+
+        await NotificationsService.scheduleShiftReminders(
+          offerId: offerId,
+          shiftStart: start,
+          venue: (p["venue"] ?? "").toString(),
+        );
+      }
+
       setState(() => offers.removeWhere((o) => o["_id"] == offerId));
+
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,

@@ -1,0 +1,1 @@
+MONGO_URI=mongodb+srv://rename90474_db_user:Rabblo@123@cluster0.mxv7ynt.mongodb.net/recruitment_app?retryWrites=true&w=majority

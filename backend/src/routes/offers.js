@@ -39,14 +39,33 @@ async function sendPush(token, title, body, data = {}) {
     try {
         await admin.messaging().send({
             token,
+
+            // what the user sees
             notification: { title, body },
+
+            // IMPORTANT for lock-screen reliability
+            android: {
+                priority: "high",
+                notification: {
+                    channelId: "recruitment_channel",
+                    sound: "default",
+                },
+            },
+
+            // iOS sound (safe even if you don’t build iOS yet)
+            apns: {
+                payload: {
+                    aps: { sound: "default" },
+                },
+            },
+
             // data values MUST be strings
             data: Object.fromEntries(
                 Object.entries(data).map(([k, v]) => [k, String(v)])
             ),
         });
     } catch (err) {
-        console.error("FCM send error:", (err && err.message) ? err.message : err);
+        console.error("FCM send error:", err ? .message || err);
     }
 }
 
